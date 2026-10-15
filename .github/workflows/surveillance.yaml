@@ -3,17 +3,32 @@ on:
     - cron: "*/5 * * * *"
   workflow_dispatch:
 jobs:
-  monitoring_job:
+  check:
     runs-on: ubuntu-latest
-    name: "Monitoring job"
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: "Check for updates"
-        uses: lcian/website-change-monitor-action@v1
-        id: check
-        with:
-          url: "https://hopcash.ch/530-ps5"
-          discord-webhook-url: ${{ secrets.DISCORD_WEBHOOK }}
+      - name: Verifier les consoles PS5
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          URL="https://hopcash.ch/530-ps5"
+          html=$(curl -fsSL -A "Mozilla/5.0 (X11; Linux x86_64)" -H "Accept: text/html" "$URL")
+          current=$(echo "$html" | grep -oE 'https://hopcash\.ch/ps5/[0-9]+-[0-9]+-[a-z0-9-]*console[a-z0-9-]*\.html' | sort -u || true)
+          previous=$(gh variable get PS5_CONSOLES --repo "$REPO" 2>/dev/null || echo "__none__")
+          new=""
+          if [ "$previous" != "__none__" ]; then
+            for u in $current; do
+              if ! grep -qF "$u" <<< "$previous"; then
+                new="$new$u"$'\n'
+              fi
+            done
+          fi
+          if [ -n "$new" ]; then
+            msg=$(printf "🎮 Nouvelle console PS5 sur HopCash :\n%s" "$new")
+            jq -n --arg c "$msg" '{content:$c}' | curl -fsS -H "Content-Type: application/json" -d @- "$WEBHOOK"
+          fi
+          stored=$(echo "$current" | tr '\n' ' ')
+          if [ -z "${stored// /}" ]; then stored="none"; fi
+          gh variable set PS5_CONSOLES --repo "$REPO" --body "$stored"
