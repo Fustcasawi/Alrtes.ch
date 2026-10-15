@@ -1,3 +1,4 @@
+name: Iphone 18
 on:
   schedule:
     - cron: "*/5 * * * *"
