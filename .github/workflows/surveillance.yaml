@@ -16,7 +16,7 @@ jobs:
           set -euo pipefail
           URL="https://hopcash.ch/530-ps5"
           html=$(curl -fsSL -A "Mozilla/5.0 (X11; Linux x86_64)" -H "Accept: text/html" "$URL")
-          current=$(echo "$html" | grep -oE 'https://hopcash\.ch/ps5/[0-9]+-[0-9]+-[a-z0-9-]*console[a-z0-9-]*\.html' | sort -u || true)
+          current=$(echo "$html" | grep -oE 'https://hopcash\.ch/ps5/[0-9]+-[0-9]+-[a-z0-9-]+\.html' | sort -u | grep -E 'console|slim|digital|disc|825|1tb|2tb|1to|2to|ps5-pro' | grep -vE 'portal|thrustmaster|dualsense|manette|casque|volant|pulse|camera|support' || true)
           previous=$(gh variable get PS5_CONSOLES --repo "$REPO" 2>/dev/null || echo "__none__")
           new=""
           if [ "$previous" != "__none__" ]; then
