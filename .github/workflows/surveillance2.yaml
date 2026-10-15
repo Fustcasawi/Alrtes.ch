@@ -1,0 +1,19 @@
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+jobs:
+  monitoring_job:
+    runs-on: ubuntu-latest
+    name: "Monitoring job 2"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: "Check for updates"
+        uses: lcian/website-change-monitor-action@v1
+        id: check
+        with:
+          url: "https://hopcash.ch/?utm_campaign=gs-2022-02-26&utm_source=google&utm_medium=smart_campaign&gad_source=1&gad_campaignid=22757951492&gclid=CjwKCAjw56zWBhB0EiwAdPOQOVEio2b7a5kP_qYpzcOAQ8B-yp1LCxa96x_AlscS6kdIpPuvsEEWvhoCQycQAvD_BwE?utm_campaign=gs-2022-02-26&utm_source=google&utm_medium=smart_campaign&gad_source=1&gad_campaignid=22757951492&gclid=CjwKCAjw56zWBhB0EiwAdPOQOVEio2b7a5kP_qYpzcOAQ8B-yp1LCxa96x_AlscS6kdIpPuvsEEWvhoCQycQAvD_BwE#e4fd/fullscreen/m=and&q=iphone+18"
+          discord-webhook-url: ${{ secrets.DISCORD_WEBHOOK }}
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
