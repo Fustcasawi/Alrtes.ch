@@ -4,17 +4,50 @@ on:
     - cron: "*/5 * * * *"
   workflow_dispatch:
 jobs:
-  monitoring_job:
+  check:
     runs-on: ubuntu-latest
-    name: "Monitoring job 2"
+    env:
+      GH_TOKEN: ${{ secrets.GH_TOKEN }}
+      WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+      REPO: ${{ github.repository }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: "Check for updates"
-        uses: lcian/website-change-monitor-action@v1
-        id: check
-        with:
-          url: "https://hopcash.ch/?utm_campaign=gs-2022-02-26&utm_source=google&utm_medium=smart_campaign&gad_source=1&gad_campaignid=22757951492&gclid=CjwKCAjw56zWBhB0EiwAdPOQOVEio2b7a5kP_qYpzcOAQ8B-yp1LCxa96x_AlscS6kdIpPuvsEEWvhoCQycQAvD_BwE?utm_campaign=gs-2022-02-26&utm_source=google&utm_medium=smart_campaign&gad_source=1&gad_campaignid=22757951492&gclid=CjwKCAjw56zWBhB0EiwAdPOQOVEio2b7a5kP_qYpzcOAQ8B-yp1LCxa96x_AlscS6kdIpPuvsEEWvhoCQycQAvD_BwE#e4fd/fullscreen/m=and&q=iphone+18"
-          discord-webhook-url: ${{ secrets.DISCORD_WEBHOOK }}
-        env:
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+      - name: Verifier les iPhone 18
+        run: |
+          set -euo pipefail
+          URL="https://hopcash.ch/recherche?controller=search&s=iphone+18"
+          html=$(curl -fsSL -A "Mozilla/5.0 (X11; Linux x86_64)" "$URL")
+          current=$(echo "$html" | grep -oE 'https://hopcash\.ch/[a-z0-9-]+/[0-9]+-[0-9]+-[a-z0-9-]+\.html' | sort -u | grep -iE 'iphone-?18' || true)
+          count=$(echo "$current" | grep -c . || true)
+          echo "iPhone 18 trouves : $count"
+          echo "$current"
+
+          if previous=$(gh variable get IPHONE18_PRODUITS --repo "$REPO" 2>err.txt); then
+            :
+          elif grep -qiE "404|not found" err.txt; then
+            previous="__none__"
+          else
+            echo "ERREUR lecture variable :"; cat err.txt; exit 1
+          fi
+
+          send() { jq -n --arg c "$1" '{content:$c}' | curl -fsS -H "Content-Type: application/json" -d @- "$WEBHOOK"; }
+
+          if [ "$previous" = "__none__" ]; then
+            send "✅ Surveillance iPhone 18 initialisee : $count produit(s) deja en ligne."
+          else
+            new=""
+            for u in $current; do
+              grep -qF "$u" <<< "$previous" || new="$new$u"$'\n'
+            done
+            if [ -n "$new" ]; then
+              send "$(printf '📱 Nouvel iPhone 18 sur HopCash :\n%s' "$new")"
+            fi
+          fi
+
+          stored=$(echo "$current" | tr '\n' ' ')
+          if [ -z "${stored// /}" ]; then stored="none"; fi
+          gh variable set IPHONE18_PRODUITS --repo "$REPO" --body "$stored"
+
+      - name: Alerte en cas d'echec
+        if: failure()
+        run: |
+          jq -n '{content:"⚠️ La surveillance iPhone 18 a plante. Regarde l onglet Actions."}' | curl -fsS -H "Content-Type: application/json" -d @- "$WEBHOOK"
