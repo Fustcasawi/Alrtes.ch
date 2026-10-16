@@ -15,7 +15,8 @@ jobs:
         run: |
           set -euo pipefail
           echo "VERSION 4 - webhook: ${WEBHOOK:+present}"
-jq -n '{content:"🔧 Test workflow PS5 version 4"}' | curl -fsS -H "Content-Type: application/json" -d @- "$WEBHOOK"
+          jq -n '{content:"🔧 Test workflow PS5 version 4"}' | curl -fsS -H "Content-Type: application/json" -d @- "$WEBHOOK"
+
           URL="https://hopcash.ch/530-ps5"
 
           send() {
@@ -25,7 +26,6 @@ jq -n '{content:"🔧 Test workflow PS5 version 4"}' | curl -fsS -H "Content-Typ
 
           html=$(curl -fsSL -A "Mozilla/5.0 (X11; Linux x86_64)" -H "Accept: text/html" "$URL")
 
-          # Tous les produits de la page
           all=$(echo "$html" \
             | grep -oE 'https://hopcash\.ch/[a-z0-9-]+/[0-9]+-[0-9]+-[a-z0-9-]+\.html' \
             | sort -u || true)
@@ -35,7 +35,6 @@ jq -n '{content:"🔧 Test workflow PS5 version 4"}' | curl -fsS -H "Content-Typ
             exit 1
           fi
 
-          # On ne garde que les consoles, on retire accessoires et jeux
           current=$(echo "$all" \
             | grep -iE '/[0-9]+-[0-9]+-[a-z0-9-]*(console|playstation-5|playstation-ps5|ps5-slim|ps5-pro|ps5-digital|ps5-disc|ps5-825|ps5-1tb|ps5-2tb|ps5-standard)' \
             | grep -viE 'portal|thrustmaster|dualsense|dualshock|manette|casque|headset|volant|pulse|camera|support|chargeur|station|telecommande|cable|housse|shifter|pedalier|pack-thrustmaster|jeu|edition-day|deluxe' || true)
@@ -50,6 +49,8 @@ jq -n '{content:"🔧 Test workflow PS5 version 4"}' | curl -fsS -H "Content-Typ
             echo "Erreur lecture variable :"; cat "$err"
             exit 1
           fi
+
+          echo "first=$first | consoles trouvées: $(echo "$current" | grep -c . || true)"
 
           if [ "$first" = "1" ]; then
             count=$(echo "$current" | grep -c . || true)
