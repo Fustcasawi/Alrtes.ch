@@ -14,6 +14,8 @@ jobs:
           REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
+          echo "VERSION 4 - webhook: ${WEBHOOK:+present}"
+jq -n '{content:"🔧 Test workflow PS5 version 4"}' | curl -fsS -H "Content-Type: application/json" -d @- "$WEBHOOK"
           URL="https://hopcash.ch/530-ps5"
 
           send() {
