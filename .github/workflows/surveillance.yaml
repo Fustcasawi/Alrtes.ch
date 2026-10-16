@@ -15,21 +15,55 @@ jobs:
         run: |
           set -euo pipefail
           URL="https://hopcash.ch/530-ps5"
+
+          send() {
+            jq -n --arg c "$(printf '%s' "$1" | head -c 1900)" '{content:$c}' \
+              | curl -fsS -H "Content-Type: application/json" -d @- "$WEBHOOK"
+          }
+
           html=$(curl -fsSL -A "Mozilla/5.0 (X11; Linux x86_64)" -H "Accept: text/html" "$URL")
-          current=$(echo "$html" | grep -oE 'https://hopcash\.ch/ps5/[0-9]+-[0-9]+-[a-z0-9-]+\.html' | sort -u | grep -E 'console|slim|digital|disc|825|1tb|2tb|1to|2to|ps5-pro' | grep -vE 'portal|thrustmaster|dualsense|manette|casque|volant|pulse|camera|support' || true)
-          previous=$(gh variable get PS5_CONSOLES --repo "$REPO" 2>/dev/null || echo "__none__")
-          new=""
-          if [ "$previous" != "__none__" ]; then
+
+          # Tous les produits de la page
+          all=$(echo "$html" \
+            | grep -oE 'https://hopcash\.ch/[a-z0-9-]+/[0-9]+-[0-9]+-[a-z0-9-]+\.html' \
+            | sort -u || true)
+
+          if [ -z "$all" ]; then
+            echo "Aucun produit trouvé : page modifiée ou bloquée ?"
+            exit 1
+          fi
+
+          # On ne garde que les consoles, on retire accessoires et jeux
+          current=$(echo "$all" \
+            | grep -iE '/[0-9]+-[0-9]+-[a-z0-9-]*(console|playstation-5|playstation-ps5|ps5-slim|ps5-pro|ps5-digital|ps5-disc|ps5-825|ps5-1tb|ps5-2tb|ps5-standard)' \
+            | grep -viE 'portal|thrustmaster|dualsense|dualshock|manette|casque|headset|volant|pulse|camera|support|chargeur|station|telecommande|cable|housse|shifter|pedalier|pack-thrustmaster|jeu|edition-day|deluxe' || true)
+
+          err=$(mktemp)
+          if previous=$(gh variable get PS5_CONSOLES --repo "$REPO" 2>"$err"); then
+            first=0
+          elif grep -qiE "not found|404" "$err"; then
+            first=1
+            previous=""
+          else
+            echo "Erreur lecture variable :"; cat "$err"
+            exit 1
+          fi
+
+          if [ "$first" = "1" ]; then
+            count=$(echo "$current" | grep -c . || true)
+            send "✅ Surveillance consoles PS5 HopCash initialisée : $count console(s) actuellement en vente. Tu seras notifié de chaque nouvelle console."
+          else
+            new=""
             for u in $current; do
               if ! grep -qF "$u" <<< "$previous"; then
                 new="$new$u"$'\n'
               fi
             done
+            if [ -n "$new" ]; then
+              send "$(printf '🎮 Nouvelle console PS5 en vente sur HopCash :\n%s' "$new")"
+            fi
           fi
-          if [ -n "$new" ]; then
-            msg=$(printf "🎮 Nouvelle console PS5 sur HopCash :\n%s" "$new")
-            jq -n --arg c "$msg" '{content:$c}' | curl -fsS -H "Content-Type: application/json" -d @- "$WEBHOOK"
-          fi
+
           stored=$(echo "$current" | tr '\n' ' ')
           if [ -z "${stored// /}" ]; then stored="none"; fi
           gh variable set PS5_CONSOLES --repo "$REPO" --body "$stored"
